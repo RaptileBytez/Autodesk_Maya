@@ -1,0 +1,64 @@
+// --- Setup ---
+float $weightTolerance = 0.001; // Mindestgewicht, das als "aktiv" zählt
+int $maxInf = 4;                // Maximal erlaubte aktive Influencen
+string $sel[] = `ls -sl -type "transform"`;
+
+if (size($sel) != 1) {
+    error "Bitte wählen Sie genau ein Mesh-Objekt aus (Transform-Node).";
+}
+
+// 1. Finde Skin Cluster (robust)
+string $shape[] = `listRelatives -shapes $sel[0]`;
+string $skinCluster[] = `listConnections -type "skinCluster" $shape[0]`;
+
+if (size($skinCluster) == 0) {
+    error ("Kein Skin Cluster auf dem Objekt " + $sel[0] + " gefunden.");
+}
+
+// 2. Alle Influencen und Vertices abrufen
+string $allInfs[] = `skinCluster -query -inf $skinCluster[0]`;
+string $allVtx[] = `polyListComponentConversion -toVertex $sel[0]`;
+$allVtx = `ls -fl $allVtx`; // Vertices flach machen
+
+select -cl; // Auswahl bereinigen
+
+// 3. Iteriere und Zähle aktive Influencen
+for($vtx in $allVtx)
+{
+    int $activeInfsCount = 0;
+
+    // Nur über die tatsächlich beeinflussenden Joints iterieren (effizienter)
+    // Wenn die Liste $allInfs zu lang ist, ist das Original-Skript O.K.
+
+    for ($inf in $allInfs)
+    {
+        // skinPercent gibt den aktuellen Gewichtswert zurück
+        float $weight = `skinPercent -transform $inf -query $skinCluster[0] $vtx`;
+
+        if ($weight > $weightTolerance)
+        {
+            $activeInfsCount += 1;
+        }
+    }
+
+    // 4. Prüfe, ob Grenzwert überschritten
+    if ($activeInfsCount > $maxInf)
+    {
+        select -add $vtx;
+    }
+}
+
+// 5. Finales Output und Modus-Wechsel (Wiederherstellung der Funktionalität)
+
+// A) Sicherstellen, dass nur die Vertices in der aktuellen Auswahl gespeichert sind
+string $infVtx[] = `ls -sl -fl`;
+
+// B) Den Anzeigemodus des Ursprungsobjekts auf Vertex umschalten,
+//    damit die Auswahl (und die Zählung) sichtbar wird.
+select -r $sel[0]; // Das Ursprungsobjekt auswählen
+doMenuComponentSelection($sel[0], "vertex"); // In den Vertex-Modus wechseln
+
+// C) Die tatsächliche gefundene Auswahl wiederherstellen
+select -r $infVtx;
+
+print ( (size($infVtx)) + " Vertices haben mehr als " + $maxInf + " aktive Influencen (Gewicht > " + $weightTolerance + ").\n");

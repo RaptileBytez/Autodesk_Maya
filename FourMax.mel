@@ -1,0 +1,80 @@
+// =================================================================
+// MEL Script: pruneMaxInfluences
+// FUNKTIONAL, SYNTAKTISCH KORRIGIERT
+// =================================================================
+global proc pruneMaxInfluences()
+{
+    // --- SCRIPT PARAMETER ---
+    int $MaxInfluence = 4;
+    float $weightTolerance = 0.0001;
+    // ------------------------
+
+    // --- 1. VORBEREITUNG & FEHLERPRÜFUNG ---
+    string $Selection[] = `ls -sl -type "transform"`;
+
+    if (size($Selection) != 1) {
+        warning "Bitte waehlen Sie genau ein Mesh-Objekt (Transform-Node) aus.";
+        return;
+    }
+
+    // findRelatedSkinCluster gibt EINEN String zurück.
+    string $SkinNode = `findRelatedSkinCluster $Selection[0]`; 
+    if ($SkinNode == "") {
+        warning ("Auf dem Objekt '" + $Selection[0] + "' wurde kein Skin Cluster gefunden.");
+        return;
+    }
+
+    int $VertsCount[] = `polyEvaluate -v $Selection[0]`;
+    int $numVtx = $VertsCount[0];
+    int $prunedCount = 0;
+    
+    // --- 2. HAUPTSCHLEIFE ÜBER ALLE VERTICES ---
+    // KORREKTUR: $i MUSS vor der for-Schleife deklariert werden!
+    int $i = 0; 
+    for ($i = 0; $i < $numVtx; $i++) 
+    {
+        // Korrekte Syntax zum Adressieren des Vertex:
+        string $Vertex = $Selection[0] + ".vtx[" + $i + "]"; 
+
+        float $Weights[] = `skinPercent -ignoreBelow $weightTolerance -query -value $SkinNode $Vertex`;
+        int $weightSize = size($Weights);
+
+        if ($weightSize > $MaxInfluence)
+        {
+            // --- 3. SORTIERUNG (Bubble Sort) ---
+            // KORREKTUR: $k und $j MÜSSEN vor den inneren for-Schleifen deklariert werden!
+            int $k;
+            int $j;
+            
+            for ($k = 0; $k < $weightSize; $k++) {
+                for ($j = 0; $j < $weightSize - 1 - $k; $j++) {
+                    if ($Weights[$j] < $Weights[$j+1]) {
+                        float $temp = $Weights[$j];
+                        $Weights[$j] = $Weights[$j+1];
+                        $Weights[$j+1] = $temp;
+                    }
+                }
+            }
+            
+            // Finde den Pruning-Schwellenwert
+            float $pruneValue = $Weights[$MaxInfluence];
+
+            // --- 4. PRUNING ---
+            float $threshold = $pruneValue + $weightTolerance;
+            
+            skinPercent -pruneWeights $threshold $SkinNode $Vertex;
+            $prunedCount++;
+        }
+    }
+    
+    // --- 5. ABSCHLUSSMELDUNG ---
+    print ("\n--- BERICHT ---\n");
+    print ("Operation abgeschlossen auf Objekt '" + $Selection[0] + "'.\n");
+    print ($prunedCount + " Vertices wurden beschnitten (Max Inf. = " + $MaxInfluence + ").\n");
+    print ("\n");
+}
+
+// =================================================================
+// FUNKTIONSAUFRUF: Das Skript MUSS diesen Aufruf am Ende haben.
+// =================================================================
+pruneMaxInfluences;
