@@ -2,7 +2,7 @@
 A collection of MEL scripts for Autodesk Maya focused on skinning and
 rigging workflows.
 
-div align="center">
+<div align="center">
     <img src="assets/raptile_bytez_logo.png" alt="Raptile Bytez Logo" width="250">
     <br>
     <img src="assets/panther_banner.png" alt="Giulia AI Cyber Jungle Banner" width="100%">
